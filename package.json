@@ -1,0 +1,25 @@
+{
+  "name": "privacy_vault",
+  "version": "1.0.0",
+  "description": "It is what it isnt",
+  "license": "ISC",
+  "author": "a55",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "serve": "npx http-server -p 8080",
+    "build": "pkg . --targets node18-macos-x64 --output dist/privacy-vault",
+    "build:win": "pkg . --targets node18-win-x64 --output dist/privacy-vault.exe"
+  },
+  "bin": "server.js",
+  "pkg": {
+    "assets": [
+      "index.html"
+    ],
+    "outputPath": "dist"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  }
+}
