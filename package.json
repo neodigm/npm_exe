@@ -10,8 +10,8 @@
     "test": "node --test",
     "start": "node server.js",
     "serve": "npx http-server -p 8080",
-    "build": "pkg . --targets node18-macos-x64 --output dist/privacy-vault",
-    "build:win": "pkg . --targets node18-win-x64 --output dist/privacy-vault.exe"
+    "build": "pkg . --targets node18-macos-x64 --output dist/RAINPATH",
+    "build:win": "pkg . --targets node18-win-x64 --output dist/RAINPATH.exe"
   },
   "bin": "server.js",
   "pkg": {

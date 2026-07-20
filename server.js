@@ -4,7 +4,7 @@ const net = require('net');
 const app = require('./app');
 
 const PORTS = [3000, 8080, 5000, 8000];
-const TARGET_OS = 'macos'; // Set to 'macos' or 'windows'
+const TARGET_OS = 'windows'; // Set to 'macos' or 'windows'
 
 const server = http.createServer(app);
 
