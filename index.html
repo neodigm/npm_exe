@@ -1,11 +1,196 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello World</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LangChain Stream Demo</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 2rem;
+      background: #111827;
+      color: #f9fafb;
+    }
+    .panel {
+      max-width: 720px;
+      margin: 0 auto;
+      background: #1f2937;
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+    }
+    textarea, input, button {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      border: 1px solid #374151;
+      font: inherit;
+      margin-top: 0.75rem;
+      box-sizing: border-box;
+    }
+    button {
+      cursor: pointer;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      font-weight: 600;
+    }
+    #conversation {
+      margin-top: 1rem;
+      display: grid;
+      gap: 0.75rem;
+    }
+    .bubble {
+      background: #030712;
+      border: 1px solid #374151;
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
+      white-space: pre-wrap;
+    }
+    .bubble strong {
+      display: block;
+      margin-bottom: 0.35rem;
+      color: #93c5fd;
+    }
+    .bubble.user {
+      border-color: #2563eb;
+    }
+    .bubble.assistant {
+      border-color: #10b981;
+    }
+  </style>
 </head>
 <body>
-    <h1>Hello World</h1>
+  <div class="panel">
+    <h1>LangChain streamed dialog</h1>
+    <p>Paste your Anthropic API key, send a prompt, and watch the conversation build in real time.</p>
+
+    <label for="apiKey">Anthropic API key</label>
+    <input id="apiKey" type="password" placeholder="Paste your key here" />
+
+    <label for="prompt">Prompt</label>
+    <textarea id="prompt" rows="4">Write a short, cheerful hello from a local executable.</textarea>
+
+    <button id="run">Run stream</button>
+    <div id="conversation"></div>
+  </div>
+
+  <script>
+    const conversation = document.getElementById('conversation');
+    const runButton = document.getElementById('run');
+    const promptInput = document.getElementById('prompt');
+    const apiKeyInput = document.getElementById('apiKey');
+
+    let conversationItems = [];
+
+    function createBubble(role, text) {
+      const item = document.createElement('div');
+      item.className = `bubble ${role}`;
+      item.innerHTML = `<strong>${role === 'user' ? 'You' : 'Assistant'}</strong><div>${text}</div>`;
+      return item;
+    }
+
+    function renderConversation() {
+      conversation.innerHTML = '';
+      conversationItems.forEach((item) => conversation.appendChild(createBubble(item.role, item.text)));
+    }
+
+    function extractTextFromEvent(raw) {
+      try {
+        const payload = JSON.parse(raw);
+        const chunk = payload?.data?.chunk;
+        if (typeof chunk?.content === 'string') {
+          return chunk.content;
+        }
+        if (Array.isArray(chunk?.content)) {
+          return chunk.content.map((item) => (typeof item === 'string' ? item : item?.text ?? '')).join('');
+        }
+      } catch {
+        return '';
+      }
+      return '';
+    }
+
+    runButton.addEventListener('click', async () => {
+      const prompt = promptInput.value.trim();
+      const apiKey = apiKeyInput.value.trim();
+
+      if (!prompt) {
+        alert('Please enter a prompt.');
+        return;
+      }
+
+      if (!apiKey) {
+        alert('Please paste your Anthropic API key.');
+        return;
+      }
+
+      const currentEntry = { role: 'assistant', text: '' };
+      conversationItems.push({ role: 'user', text: prompt });
+      conversationItems.push(currentEntry);
+      renderConversation();
+      runButton.disabled = true;
+      runButton.textContent = 'Streaming…';
+
+      try {
+        const response = await fetch('/rai/stream_events', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-rai-key': '0197',
+            'x-anthropic-api-key': apiKey
+          },
+          body: JSON.stringify({ input: prompt })
+        });
+
+        if (!response.ok) {
+          const message = await response.text();
+          currentEntry.text = `Request failed: ${message}`;
+          renderConversation();
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const frames = buffer.split('\n\n');
+          buffer = frames.pop() || '';
+
+          for (const frame of frames) {
+            const line = frame.startsWith('data: ') ? frame.slice(6) : frame;
+            const text = extractTextFromEvent(line);
+            if (text) {
+              currentEntry.text += text;
+              renderConversation();
+            }
+          }
+        }
+
+        if (buffer) {
+          const text = extractTextFromEvent(buffer.startsWith('data: ') ? buffer.slice(6) : buffer);
+          if (text) {
+            currentEntry.text += text;
+          }
+        }
+
+        renderConversation();
+      } catch (error) {
+        currentEntry.text = `Stream error: ${error.message}`;
+        renderConversation();
+      } finally {
+        runButton.disabled = false;
+        runButton.textContent = 'Run stream';
+      }
+    });
+  </script>
 </body>
 </html>
